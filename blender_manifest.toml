@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "ninos_tools"
+version = "1.0.0"
+name = "Nino's Tools"
+tagline = "Collection of helpful modeling tools"
+maintainer = "Nino"
+type = "add-on"
+
+tags = ["Modeling", "Mesh", "3D View"]
+
+blender_version_min = "4.2.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+[permissions]
+files = "Addon preferences and configuration"
