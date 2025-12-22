@@ -1,10 +1,18 @@
 [project]
-name = "blender-scripts"
+name = "blender_scripts"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
+    "fake-bpy-module-latest>=20251003",
     "flake8>=7.1.1",
+    "pyright>=1.1.407",
+    "ruff>=0.7.1",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.0",
     "ruff>=0.7.1",
 ]
