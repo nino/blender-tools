@@ -5,7 +5,7 @@ Nino's Tools - A Blender addon for subdivision surface management and more.
 bl_info = {
     "name": "Nino's Tools",
     "author": "Nino",
-    "version": (1, 2, 1),
+    "version": (1, 4, 0),
     "blender": (3, 0, 0),
     "location": "View3D > N Panel > Nino's Tools",
     "description": "Collection of helpful modeling tools",
@@ -168,120 +168,157 @@ class NINO_OT_cycle_subsurf_preview(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def _subdivide_selection_impl(
+    context: Context, boundary_smooth: str = "All"
+) -> tuple[set[OperatorReturnItems], str]:
+    """
+    Subdivide selected geometry using geometry nodes.
+
+    Args:
+        context: Blender context
+        boundary_smooth: Boundary smooth mode ('All' or 'Keep Corners')
+
+    Returns:
+        Tuple of (operator return set, message)
+    """
+    # Check if we're in edit mode
+    if context.mode != "EDIT_MESH":
+        return {"CANCELLED"}, "Must be in edit mode"
+
+    obj = context.active_object
+    if obj is None or obj.type != "MESH":
+        return {"CANCELLED"}, "No active mesh object"
+
+    # 1. Generate a random ID
+    random_id = str(uuid.uuid4())[:8]
+    vertex_group_name = f"vertex-group-{random_id}"
+    modifier_name = f"geonodes-{random_id}"
+
+    # 2. Assign current selection to a new vertex group
+    vertex_group = obj.vertex_groups.new(name=vertex_group_name)
+    bpy.ops.object.vertex_group_assign()
+
+    # 3. Switch to object mode to add modifier
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    # 4. Add geometry nodes modifier
+    modifier = obj.modifiers.new(name=modifier_name, type="NODES")
+
+    # Create a new geometry nodes tree
+    node_tree = bpy.data.node_groups.new(
+        name=f"Subdivide-{random_id}", type="GeometryNodeTree"
+    )
+    modifier.node_group = node_tree
+
+    # Create nodes
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    # Clear default nodes
+    nodes.clear()
+
+    # Create Group Input and Group Output nodes
+    group_input = nodes.new("NodeGroupInput")
+    group_output = nodes.new("NodeGroupOutput")
+
+    # Position nodes
+    group_input.location = (-600, 0)
+    group_output.location = (600, 0)
+
+    # Create required sockets on the node tree
+    node_tree.interface.new_socket(
+        name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry"
+    )
+    node_tree.interface.new_socket(
+        name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry"
+    )
+
+    # Create Separate Geometry node
+    separate_geo = nodes.new("GeometryNodeSeparateGeometry")
+    separate_geo.location = (-300, 0)
+    separate_geo.domain = "POINT"
+
+    # Create Named Attribute node for vertex group
+    named_attr = nodes.new("GeometryNodeInputNamedAttribute")
+    named_attr.location = (-500, -150)
+    named_attr.data_type = "FLOAT"
+    named_attr.inputs[0].default_value = vertex_group_name
+
+    # Create Subdivision Surface node
+    subsurf = nodes.new("GeometryNodeSubdivisionSurface")
+    subsurf.location = (0, 100)
+    subsurf.inputs["Level"].default_value = 1
+    subsurf.inputs[6].default_value = boundary_smooth
+
+    # Create Join Geometry node
+    join_geo = nodes.new("GeometryNodeJoinGeometry")
+    join_geo.location = (300, 0)
+
+    # Link nodes
+    # Group Input -> Separate Geometry
+    links.new(group_input.outputs["Geometry"], separate_geo.inputs["Geometry"])
+
+    # Named Attribute -> Separate Geometry (Selection)
+    links.new(named_attr.outputs["Attribute"], separate_geo.inputs["Selection"])
+
+    # Separate Geometry (Selection) -> Subdivision Surface
+    links.new(separate_geo.outputs["Selection"], subsurf.inputs["Mesh"])
+
+    # Subdivision Surface -> Join Geometry
+    links.new(subsurf.outputs["Mesh"], join_geo.inputs["Geometry"])
+
+    # Separate Geometry (Inverted) -> Join Geometry
+    links.new(separate_geo.outputs["Inverted"], join_geo.inputs["Geometry"])
+
+    # Join Geometry -> Group Output
+    links.new(join_geo.outputs["Geometry"], group_output.inputs["Geometry"])
+
+    # 5. Apply the modifier
+    bpy.ops.object.modifier_apply(modifier=modifier_name)
+
+    # 6. Go back to edit mode
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    active_object = bpy.context.active_object
+    group = active_object.vertex_groups.get(vertex_group_name)
+    if group:
+        active_object.vertex_groups.remove(group)
+
+    return {"FINISHED"}, "Subdivided selection"
+
+
 class NINO_OT_subdivide_selection(bpy.types.Operator):
-    """Subdivide selected geometry using geometry nodes"""
+    """Subdivide selected geometry using geometry nodes (smooth all)"""
 
     bl_idname = "nino.subdivide_selection"
-    bl_label = "Subdivide Selection"
+    bl_label = "Subdivide Selection (Smooth All)"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context: Context) -> set[OperatorReturnItems]:
-        # Check if we're in edit mode
-        if context.mode != "EDIT_MESH":
-            self.report({"WARNING"}, "Must be in edit mode")
-            return {"CANCELLED"}
+        result, message = _subdivide_selection_impl(context, boundary_smooth="All")
+        if result == {"CANCELLED"}:
+            self.report({"WARNING"}, message)
+        else:
+            self.report({"INFO"}, message)
+        return result
 
-        obj = context.active_object
-        if obj is None or obj.type != "MESH":
-            self.report({"WARNING"}, "No active mesh object")
-            return {"CANCELLED"}
 
-        # 1. Generate a random ID
-        random_id = str(uuid.uuid4())[:8]
-        vertex_group_name = f"vertex-group-{random_id}"
-        modifier_name = f"geonodes-{random_id}"
+class NINO_OT_subdivide_selection_keep_corners(bpy.types.Operator):
+    """Subdivide selected geometry using geometry nodes (keep corners)"""
 
-        # 2. Assign current selection to a new vertex group
-        vertex_group = obj.vertex_groups.new(name=vertex_group_name)
-        bpy.ops.object.vertex_group_assign()
+    bl_idname = "nino.subdivide_selection_keep_corners"
+    bl_label = "Subdivide Selection (Keep Corners)"
+    bl_options = {"REGISTER", "UNDO"}
 
-        # 3. Switch to object mode to add modifier
-        bpy.ops.object.mode_set(mode="OBJECT")
-
-        # 4. Add geometry nodes modifier
-        modifier = obj.modifiers.new(name=modifier_name, type="NODES")
-
-        # Create a new geometry nodes tree
-        node_tree = bpy.data.node_groups.new(
-            name=f"Subdivide-{random_id}", type="GeometryNodeTree"
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        result, message = _subdivide_selection_impl(
+            context, boundary_smooth="Keep Corners"
         )
-        modifier.node_group = node_tree
-
-        # Create nodes
-        nodes = node_tree.nodes
-        links = node_tree.links
-
-        # Clear default nodes
-        nodes.clear()
-
-        # Create Group Input and Group Output nodes
-        group_input = nodes.new("NodeGroupInput")
-        group_output = nodes.new("NodeGroupOutput")
-
-        # Position nodes
-        group_input.location = (-600, 0)
-        group_output.location = (600, 0)
-
-        # Create required sockets on the node tree
-        node_tree.interface.new_socket(
-            name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry"
-        )
-        node_tree.interface.new_socket(
-            name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry"
-        )
-
-        # Create Separate Geometry node
-        separate_geo = nodes.new("GeometryNodeSeparateGeometry")
-        separate_geo.location = (-300, 0)
-        separate_geo.domain = "POINT"
-
-        # Create Named Attribute node for vertex group
-        named_attr = nodes.new("GeometryNodeInputNamedAttribute")
-        named_attr.location = (-500, -150)
-        named_attr.data_type = "FLOAT"
-        named_attr.inputs[0].default_value = vertex_group_name
-
-        # Create Subdivision Surface node
-        subsurf = nodes.new("GeometryNodeSubdivisionSurface")
-        subsurf.location = (0, 100)
-        subsurf.inputs["Level"].default_value = 1
-
-        # Create Join Geometry node
-        join_geo = nodes.new("GeometryNodeJoinGeometry")
-        join_geo.location = (300, 0)
-
-        # Link nodes
-        # Group Input -> Separate Geometry
-        links.new(group_input.outputs["Geometry"], separate_geo.inputs["Geometry"])
-
-        # Named Attribute -> Separate Geometry (Selection)
-        links.new(named_attr.outputs["Attribute"], separate_geo.inputs["Selection"])
-
-        # Separate Geometry (Selection) -> Subdivision Surface
-        links.new(separate_geo.outputs["Selection"], subsurf.inputs["Mesh"])
-
-        # Subdivision Surface -> Join Geometry
-        links.new(subsurf.outputs["Mesh"], join_geo.inputs["Geometry"])
-
-        # Separate Geometry (Inverted) -> Join Geometry
-        links.new(separate_geo.outputs["Inverted"], join_geo.inputs["Geometry"])
-
-        # Join Geometry -> Group Output
-        links.new(join_geo.outputs["Geometry"], group_output.inputs["Geometry"])
-
-        # 5. Apply the modifier
-        bpy.ops.object.modifier_apply(modifier=modifier_name)
-
-        # 6. Go back to edit mode
-        bpy.ops.object.mode_set(mode="EDIT")
-
-        active_object = bpy.context.active_object
-        group = active_object.vertex_groups.get(vertex_group_name)
-        if group:
-            active_object.vertex_groups.remove(group)
-
-        self.report({"INFO"}, "Subdivided selection")
-        return {"FINISHED"}
+        if result == {"CANCELLED"}:
+            self.report({"WARNING"}, message)
+        else:
+            self.report({"INFO"}, message)
+        return result
 
 
 class NINO_PT_tools_panel(bpy.types.Panel):
@@ -302,6 +339,7 @@ class NINO_PT_tools_panel(bpy.types.Panel):
         # Wireframe settings section
         box = layout.box()
         box.label(text="Wireframe", icon="SHADING_WIRE")
+        box.prop(settings, "wireframe_on_selected")
         box.prop(settings, "wireframe_hierarchy")
 
         # Subd tools section
@@ -312,7 +350,11 @@ class NINO_PT_tools_panel(bpy.types.Panel):
         col.operator("nino.decrease_subsurf_level", text="Decrease Subd Level")
         col.operator("nino.increase_subsurf_level", text="Increase Subd Level")
         col.operator("nino.cycle_subsurf_preview", text="Cycle Subd Preview")
-        col.operator("nino.subdivide_selection", text="Subdivide Selection")
+        col.operator("nino.subdivide_selection", text="Subdivide Selection (Smooth All)")
+        col.operator(
+            "nino.subdivide_selection_keep_corners",
+            text="Subdivide Selection (Keep Corners)",
+        )
 
 
 # Keymap storage
@@ -324,6 +366,12 @@ _previous_selection = set()
 
 class NinoToolsSettings(PropertyGroup):
     """Settings for Nino's Tools"""
+
+    wireframe_on_selected: BoolProperty(
+        name="Show Wireframe on Selected",
+        description="Automatically show wireframe on selected objects",
+        default=True,
+    )
 
     wireframe_hierarchy: BoolProperty(
         name="Wireframe on Hierarchy",
@@ -350,6 +398,10 @@ def update_wire_display(scene, depsgraph):
 
     # Get settings
     settings = bpy.context.scene.nino_tools_settings
+
+    # Early exit if wireframe on selected is disabled
+    if not settings.wireframe_on_selected:
+        return
 
     # Get currently selected objects
     current_selection = set(obj.name for obj in bpy.context.selected_objects)
@@ -388,6 +440,7 @@ def register():
     bpy.utils.register_class(NINO_OT_increase_subsurf_level)
     bpy.utils.register_class(NINO_OT_cycle_subsurf_preview)
     bpy.utils.register_class(NINO_OT_subdivide_selection)
+    bpy.utils.register_class(NINO_OT_subdivide_selection_keep_corners)
     bpy.utils.register_class(NINO_PT_tools_panel)
 
     # Add settings to scene
@@ -462,6 +515,7 @@ def unregister():
     del bpy.types.Scene.nino_tools_settings
 
     bpy.utils.unregister_class(NINO_PT_tools_panel)
+    bpy.utils.unregister_class(NINO_OT_subdivide_selection_keep_corners)
     bpy.utils.unregister_class(NINO_OT_subdivide_selection)
     bpy.utils.unregister_class(NINO_OT_cycle_subsurf_preview)
     bpy.utils.unregister_class(NINO_OT_increase_subsurf_level)
