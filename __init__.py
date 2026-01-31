@@ -168,6 +168,81 @@ class NINO_OT_cycle_subsurf_preview(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class NINO_OT_toggle_subd(bpy.types.Operator):
+    """Toggle subdivision surface visibility for selected objects"""
+
+    bl_idname = "nino.toggle_subd"
+    bl_label = "Toggle Subd"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        # Build list of (object, subsurf_modifier) for all selected objects with subsurf
+        objects_with_subsurf: list[tuple[Object, SubsurfModifier]] = []
+
+        for obj in context.selected_objects:
+            if obj.type == "MESH":
+                subsurf_mods = [mod for mod in obj.modifiers if mod.type == "SUBSURF"]
+                for mod in subsurf_mods:
+                    objects_with_subsurf.append((obj, cast(SubsurfModifier, mod)))
+
+        if not objects_with_subsurf:
+            self.report({"WARNING"}, "No selected objects with subsurf modifiers")
+            return {"CANCELLED"}
+
+        # Check the first modifier's viewport visibility to determine action
+        first_mod = objects_with_subsurf[0][1]
+        should_enable = not first_mod.show_viewport
+
+        # Toggle all subsurf modifiers
+        for obj, mod in objects_with_subsurf:
+            mod.show_viewport = should_enable
+            mod.show_render = should_enable
+
+        action = "Enabled" if should_enable else "Disabled"
+        self.report(
+            {"INFO"}, f"{action} subd for {len(objects_with_subsurf)} modifier(s)"
+        )
+
+        return {"FINISHED"}
+
+
+class NINO_OT_toggle_optimal_display(bpy.types.Operator):
+    """Toggle optimal display for all subsurf modifiers on selected objects"""
+
+    bl_idname = "nino.toggle_optimal_display"
+    bl_label = "Toggle Optimal Display"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        # Build list of subsurf modifiers for all selected objects
+        subsurf_mods: list[SubsurfModifier] = []
+
+        for obj in context.selected_objects:
+            if obj.type == "MESH":
+                for mod in obj.modifiers:
+                    if mod.type == "SUBSURF":
+                        subsurf_mods.append(cast(SubsurfModifier, mod))
+
+        if not subsurf_mods:
+            self.report({"WARNING"}, "No selected objects with subsurf modifiers")
+            return {"CANCELLED"}
+
+        # Check the first modifier's optimal display state to determine action
+        first_mod = subsurf_mods[0]
+        should_enable = not first_mod.show_only_control_edges
+
+        # Toggle all subsurf modifiers
+        for mod in subsurf_mods:
+            mod.show_only_control_edges = should_enable
+
+        action = "Enabled" if should_enable else "Disabled"
+        self.report(
+            {"INFO"}, f"{action} optimal display for {len(subsurf_mods)} modifier(s)"
+        )
+
+        return {"FINISHED"}
+
+
 def _subdivide_selection_impl(
     context: Context, boundary_smooth: str = "All"
 ) -> tuple[set[OperatorReturnItems], str]:
@@ -250,6 +325,18 @@ def _subdivide_selection_impl(
     subsurf.inputs["Level"].default_value = 1
     subsurf.inputs[6].default_value = boundary_smooth
 
+    # Create Named Attribute node for edge crease
+    edge_crease_attr = nodes.new("GeometryNodeInputNamedAttribute")
+    edge_crease_attr.location = (-200, -100)
+    edge_crease_attr.data_type = "FLOAT"
+    edge_crease_attr.inputs[0].default_value = "crease_edge"
+
+    # Create Named Attribute node for vertex crease
+    vert_crease_attr = nodes.new("GeometryNodeInputNamedAttribute")
+    vert_crease_attr.location = (-200, -200)
+    vert_crease_attr.data_type = "FLOAT"
+    vert_crease_attr.inputs[0].default_value = "crease_vert"
+
     # Create Join Geometry node
     join_geo = nodes.new("GeometryNodeJoinGeometry")
     join_geo.location = (300, 0)
@@ -263,6 +350,12 @@ def _subdivide_selection_impl(
 
     # Separate Geometry (Selection) -> Subdivision Surface
     links.new(separate_geo.outputs["Selection"], subsurf.inputs["Mesh"])
+
+    # Edge Crease attribute -> Subdivision Surface
+    links.new(edge_crease_attr.outputs["Attribute"], subsurf.inputs["Edge Crease"])
+
+    # Vertex Crease attribute -> Subdivision Surface
+    links.new(vert_crease_attr.outputs["Attribute"], subsurf.inputs["Vertex Crease"])
 
     # Subdivision Surface -> Join Geometry
     links.new(subsurf.outputs["Mesh"], join_geo.inputs["Geometry"])
@@ -321,6 +414,80 @@ class NINO_OT_subdivide_selection_keep_corners(bpy.types.Operator):
         return result
 
 
+class NINO_OT_refresh_shrinkwrap(bpy.types.Operator):
+    """Refresh shrinkwrap modifier by duplicating and applying"""
+
+    bl_idname = "nino.refresh_shrinkwrap"
+    bl_label = "Refresh Shrinkwrap"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        # Check if we have a mesh object selected
+        obj = context.active_object
+        if obj is None or obj.type != "MESH":
+            self.report({"WARNING"}, "No mesh object selected")
+            return {"CANCELLED"}
+
+        # Find the first shrinkwrap modifier
+        shrinkwrap_mod = None
+        for mod in obj.modifiers:
+            if mod.type == "SHRINKWRAP":
+                shrinkwrap_mod = mod
+                break
+
+        if shrinkwrap_mod is None:
+            self.report({"WARNING"}, "No shrinkwrap modifier found")
+            return {"CANCELLED"}
+
+        # Remember if we were in edit mode
+        was_in_edit_mode = context.mode == "EDIT_MESH"
+
+        # Switch to object mode if needed
+        if was_in_edit_mode:
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+        # Duplicate the shrinkwrap modifier
+        modifier_name = shrinkwrap_mod.name
+        bpy.ops.object.modifier_copy(modifier=modifier_name)
+
+        # Apply the original modifier (the copy is now after it)
+        bpy.ops.object.modifier_apply(modifier=modifier_name)
+
+        # Go back to edit mode if needed
+        if was_in_edit_mode:
+            bpy.ops.object.mode_set(mode="EDIT")
+
+        self.report({"INFO"}, "Refreshed shrinkwrap modifier")
+        return {"FINISHED"}
+
+
+class NINO_OT_reload_all_images(bpy.types.Operator):
+    """Reload all images in the current Blender file"""
+
+    bl_idname = "nino.reload_all_images"
+    bl_label = "Reload All Images"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        reloaded_count = 0
+
+        for img in bpy.data.images:
+            # Only reload images that have a filepath (skip generated/packed images)
+            if img.filepath:
+                try:
+                    img.reload()
+                    reloaded_count += 1
+                except Exception as e:
+                    self.report({"WARNING"}, f"Failed to reload {img.name}: {str(e)}")
+
+        if reloaded_count > 0:
+            self.report({"INFO"}, f"Reloaded {reloaded_count} image(s)")
+        else:
+            self.report({"INFO"}, "No images to reload")
+
+        return {"FINISHED"}
+
+
 class NINO_PT_tools_panel(bpy.types.Panel):
     """Creates a Panel in the N-panel"""
 
@@ -350,11 +517,29 @@ class NINO_PT_tools_panel(bpy.types.Panel):
         col.operator("nino.decrease_subsurf_level", text="Decrease Subd Level")
         col.operator("nino.increase_subsurf_level", text="Increase Subd Level")
         col.operator("nino.cycle_subsurf_preview", text="Cycle Subd Preview")
-        col.operator("nino.subdivide_selection", text="Subdivide Selection (Smooth All)")
+        col.operator("nino.toggle_subd", text="Toggle Subd")
+        col.operator("nino.toggle_optimal_display", text="Toggle Optimal Display")
+        col.operator(
+            "nino.subdivide_selection", text="Subdivide Selection (Smooth All)"
+        )
         col.operator(
             "nino.subdivide_selection_keep_corners",
             text="Subdivide Selection (Keep Corners)",
         )
+
+        # Modifier tools section
+        box = layout.box()
+        box.label(text="Modifier Tools", icon="MODIFIER")
+
+        col = box.column(align=True)
+        col.operator("nino.refresh_shrinkwrap", text="Refresh Shrinkwrap")
+
+        # Image tools section
+        box = layout.box()
+        box.label(text="Image Tools", icon="IMAGE_DATA")
+
+        col = box.column(align=True)
+        col.operator("nino.reload_all_images", text="Reload All Images")
 
 
 # Keymap storage
@@ -370,7 +555,7 @@ class NinoToolsSettings(PropertyGroup):
     wireframe_on_selected: BoolProperty(
         name="Show Wireframe on Selected",
         description="Automatically show wireframe on selected objects",
-        default=True,
+        default=False,
     )
 
     wireframe_hierarchy: BoolProperty(
@@ -439,8 +624,12 @@ def register():
     bpy.utils.register_class(NINO_OT_decrease_subsurf_level)
     bpy.utils.register_class(NINO_OT_increase_subsurf_level)
     bpy.utils.register_class(NINO_OT_cycle_subsurf_preview)
+    bpy.utils.register_class(NINO_OT_toggle_subd)
+    bpy.utils.register_class(NINO_OT_toggle_optimal_display)
     bpy.utils.register_class(NINO_OT_subdivide_selection)
     bpy.utils.register_class(NINO_OT_subdivide_selection_keep_corners)
+    bpy.utils.register_class(NINO_OT_refresh_shrinkwrap)
+    bpy.utils.register_class(NINO_OT_reload_all_images)
     bpy.utils.register_class(NINO_PT_tools_panel)
 
     # Add settings to scene
@@ -515,8 +704,12 @@ def unregister():
     del bpy.types.Scene.nino_tools_settings
 
     bpy.utils.unregister_class(NINO_PT_tools_panel)
+    bpy.utils.unregister_class(NINO_OT_reload_all_images)
+    bpy.utils.unregister_class(NINO_OT_refresh_shrinkwrap)
     bpy.utils.unregister_class(NINO_OT_subdivide_selection_keep_corners)
     bpy.utils.unregister_class(NINO_OT_subdivide_selection)
+    bpy.utils.unregister_class(NINO_OT_toggle_subd)
+    bpy.utils.unregister_class(NINO_OT_toggle_optimal_display)
     bpy.utils.unregister_class(NINO_OT_cycle_subsurf_preview)
     bpy.utils.unregister_class(NINO_OT_increase_subsurf_level)
     bpy.utils.unregister_class(NINO_OT_decrease_subsurf_level)
