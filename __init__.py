@@ -136,25 +136,10 @@ class NINO_OT_cycle_subsurf_preview(bpy.types.Operator):
                     obj, default_viewport_level=2, default_render_level=2
                 )
 
-                # Determine current state and cycle to next
-                # States:
-                # 1. on_cage=False, edit_mode=False
-                # 2. on_cage=False, edit_mode=True
-                # 3. on_cage=True, edit_mode=True
-                # Note: on_cage=True, edit_mode=False is treated as state 1
-
-                if not mod.show_on_cage and not mod.show_in_editmode:
-                    # State 1 -> State 2
-                    mod.show_on_cage = False
-                    mod.show_in_editmode = True
-                elif not mod.show_on_cage and mod.show_in_editmode:
-                    # State 2 -> State 3
-                    mod.show_on_cage = True
-                    mod.show_in_editmode = True
-                else:
-                    # State 3 (or invalid state) -> State 1
-                    mod.show_on_cage = False
-                    mod.show_in_editmode = False
+                # Toggle between both off and both on
+                both_on = mod.show_on_cage and mod.show_in_editmode
+                mod.show_on_cage = not both_on
+                mod.show_in_editmode = not both_on
 
                 processed_count += 1
 
