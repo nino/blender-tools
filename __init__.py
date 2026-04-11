@@ -5,7 +5,7 @@ Nino's Tools - A Blender addon for subdivision surface management and more.
 bl_info = {
     "name": "Nino's Tools",
     "author": "Nino",
-    "version": (1, 5, 0),
+    "version": (1, 6, 0),
     "blender": (3, 0, 0),
     "location": "View3D > N Panel > Nino's Tools",
     "description": "Collection of helpful modeling tools",
@@ -27,6 +27,11 @@ OperatorReturnItems = Literal[
     "PASS_THROUGH",  # Pass Through.Do nothing and pass the event on.
     "INTERFACE",  # Interface.Handled but not executed (popup menus).
 ]
+
+COLLECTION_TO_TEXTURE_GROUP = {
+    "Hull Parts": "Main_Hull",
+    "Glass Parts": "Glass",
+}
 
 
 # Utility function to get or create subdivision surface modifier
@@ -501,6 +506,28 @@ class NINO_OT_smart_delete(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class NINO_OT_stamp_texture_groups(bpy.types.Operator):
+    """Stamp texture_group custom property on objects based on collection membership"""
+
+    bl_idname = "nino.stamp_texture_groups"
+    bl_label = "Stamp Texture Groups"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        updated_count = 0
+
+        for collection_name, group_name in COLLECTION_TO_TEXTURE_GROUP.items():
+            collection = bpy.data.collections.get(collection_name)
+            if collection is None:
+                continue
+            for obj in collection.objects:
+                obj["texture_group"] = group_name
+                updated_count += 1
+
+        self.report({"INFO"}, f"Set texture_group on {updated_count} object(s)")
+        return {"FINISHED"}
+
+
 class NINO_PT_tools_panel(bpy.types.Panel):
     """Creates a Panel in the N-panel"""
 
@@ -553,6 +580,13 @@ class NINO_PT_tools_panel(bpy.types.Panel):
 
         col = box.column(align=True)
         col.operator("nino.reload_all_images", text="Reload All Images")
+
+        # Texture tools section
+        box = layout.box()
+        box.label(text="Texture Tools", icon="TEXTURE")
+
+        col = box.column(align=True)
+        col.operator("nino.stamp_texture_groups", text="Stamp Texture Groups")
 
 
 # Keymap storage
@@ -644,6 +678,7 @@ def register():
     bpy.utils.register_class(NINO_OT_refresh_shrinkwrap)
     bpy.utils.register_class(NINO_OT_reload_all_images)
     bpy.utils.register_class(NINO_OT_smart_delete)
+    bpy.utils.register_class(NINO_OT_stamp_texture_groups)
     bpy.utils.register_class(NINO_PT_tools_panel)
 
     # Add settings to scene
@@ -728,6 +763,7 @@ def unregister():
 
     bpy.utils.unregister_class(NINO_PT_tools_panel)
     bpy.utils.unregister_class(NINO_OT_smart_delete)
+    bpy.utils.unregister_class(NINO_OT_stamp_texture_groups)
     bpy.utils.unregister_class(NINO_OT_reload_all_images)
     bpy.utils.unregister_class(NINO_OT_refresh_shrinkwrap)
     bpy.utils.unregister_class(NINO_OT_subdivide_selection_keep_corners)
