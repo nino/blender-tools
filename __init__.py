@@ -5,7 +5,7 @@ Nino's Tools - A Blender addon for subdivision surface management and more.
 bl_info = {
     "name": "Nino's Tools",
     "author": "Nino",
-    "version": (1, 4, 0),
+    "version": (1, 5, 0),
     "blender": (3, 0, 0),
     "location": "View3D > N Panel > Nino's Tools",
     "description": "Collection of helpful modeling tools",
@@ -473,6 +473,34 @@ class NINO_OT_reload_all_images(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class NINO_OT_smart_delete(bpy.types.Operator):
+    """Delete faces/vertices or dissolve edges based on current selection mode"""
+
+    bl_idname = "nino.smart_delete"
+    bl_label = "Smart Delete"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context: Context) -> bool:
+        return context.mode == "EDIT_MESH"
+
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        tool_settings = context.tool_settings
+        select_mode = tool_settings.mesh_select_mode
+
+        if select_mode[0]:
+            # Vertex mode — delete vertices
+            bpy.ops.mesh.delete(type="VERT")
+        elif select_mode[1]:
+            # Edge mode — dissolve edges
+            bpy.ops.mesh.dissolve_edges()
+        elif select_mode[2]:
+            # Face mode — delete faces
+            bpy.ops.mesh.delete(type="FACE")
+
+        return {"FINISHED"}
+
+
 class NINO_PT_tools_panel(bpy.types.Panel):
     """Creates a Panel in the N-panel"""
 
@@ -615,6 +643,7 @@ def register():
     bpy.utils.register_class(NINO_OT_subdivide_selection_keep_corners)
     bpy.utils.register_class(NINO_OT_refresh_shrinkwrap)
     bpy.utils.register_class(NINO_OT_reload_all_images)
+    bpy.utils.register_class(NINO_OT_smart_delete)
     bpy.utils.register_class(NINO_PT_tools_panel)
 
     # Add settings to scene
@@ -674,6 +703,15 @@ def register():
         )
         addon_keymaps.append((km, kmi))
 
+        # Backspace: Smart delete (in edit mode)
+        km_mesh = kc.keymaps.new(name="Mesh", space_type="EMPTY")
+        kmi = km_mesh.keymap_items.new(
+            NINO_OT_smart_delete.bl_idname,
+            type="BACK_SPACE",
+            value="PRESS",
+        )
+        addon_keymaps.append((km_mesh, kmi))
+
 
 def unregister():
     # Unregister the wire display handler
@@ -689,6 +727,7 @@ def unregister():
     del bpy.types.Scene.nino_tools_settings
 
     bpy.utils.unregister_class(NINO_PT_tools_panel)
+    bpy.utils.unregister_class(NINO_OT_smart_delete)
     bpy.utils.unregister_class(NINO_OT_reload_all_images)
     bpy.utils.unregister_class(NINO_OT_refresh_shrinkwrap)
     bpy.utils.unregister_class(NINO_OT_subdivide_selection_keep_corners)
