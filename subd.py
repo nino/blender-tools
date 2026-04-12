@@ -292,7 +292,7 @@ def _subdivide_selection_impl(
     vertex_group_name = f"vertex-group-{random_id}"
     modifier_name = f"geonodes-{random_id}"
 
-    vertex_group = obj.vertex_groups.new(name=vertex_group_name)
+    obj.vertex_groups.new(name=vertex_group_name)
     bpy.ops.object.vertex_group_assign()
 
     bpy.ops.object.mode_set(mode="OBJECT")

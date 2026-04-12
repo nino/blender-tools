@@ -16,15 +16,15 @@ bl_info = {
 if "bpy" in locals():
     import importlib
 
-    importlib.reload(subd)
-    importlib.reload(display)
-    importlib.reload(stamping)
-    importlib.reload(operators)
-    importlib.reload(ui)
+    importlib.reload(subd)  # noqa: F821
+    importlib.reload(display)  # noqa: F821
+    importlib.reload(stamping)  # noqa: F821
+    importlib.reload(operators)  # noqa: F821
+    importlib.reload(ui)  # noqa: F821
 
-import bpy
+import bpy  # noqa: E402
 
-from . import subd, display, stamping, operators, ui
+from . import subd, display, stamping, operators, ui  # noqa: E402
 
 _all_classes = (
     *display.classes,

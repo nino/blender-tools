@@ -62,20 +62,14 @@ class NINO_PT_subd_tools(bpy.types.Panel):
 
         # Toggle buttons: Edit, Toggle, Opt
         row = layout.row(align=True)
-        row.operator(
-            "nino.cycle_subsurf_preview", text="Edit", icon="EDITMODE_HLT"
-        )
+        row.operator("nino.cycle_subsurf_preview", text="Edit", icon="EDITMODE_HLT")
         row.operator("nino.toggle_subd", text="Toggle", icon="HIDE_OFF")
-        row.operator(
-            "nino.toggle_optimal_display", text="Opt", icon="MOD_WIREFRAME"
-        )
+        row.operator("nino.toggle_optimal_display", text="Opt", icon="MOD_WIREFRAME")
 
         # Subdivide buttons: Smooth, Smooth (corners)
         row = layout.row(align=True)
         row.operator("nino.subdivide_selection", text="Smooth")
-        row.operator(
-            "nino.subdivide_selection_keep_corners", text="Smooth (corners)"
-        )
+        row.operator("nino.subdivide_selection_keep_corners", text="Smooth (corners)")
 
 
 class NINO_PT_modifier_tools(bpy.types.Panel):
