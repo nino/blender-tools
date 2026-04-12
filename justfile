@@ -10,8 +10,8 @@ package:
     # Create addon directory
     mkdir -p "$ADDON_DIR"
 
-    # Copy the addon file
-    cp __init__.py "$ADDON_DIR/"
+    # Copy addon files
+    cp *.py "$ADDON_DIR/"
 
     # Create zip file
     cd "$TEMP_DIR"
