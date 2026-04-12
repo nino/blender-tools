@@ -4,6 +4,7 @@ from typing import cast, Literal
 import uuid
 
 import bpy
+from bpy.props import IntProperty
 from bpy.types import Context, SubsurfModifier, Object
 
 OperatorReturnItems = Literal[
@@ -13,6 +14,12 @@ OperatorReturnItems = Literal[
     "PASS_THROUGH",
     "INTERFACE",
 ]
+
+
+def get_existing_subsurf(obj) -> SubsurfModifier | None:
+    """Get the last subdivision surface modifier, or None if none exists."""
+    subsurf_mods = [mod for mod in obj.modifiers if mod.type == "SUBSURF"]
+    return cast(SubsurfModifier, subsurf_mods[-1]) if subsurf_mods else None
 
 
 def get_or_create_subsurf(
@@ -54,13 +61,19 @@ class NINO_OT_decrease_subsurf_level(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context: Context) -> set[OperatorReturnItems]:
+        auto_create = context.scene.nino_tools_settings.subd_auto_create
         processed_count = 0
 
         for obj in context.selected_objects:
             if obj.type == "MESH":
-                mod = get_or_create_subsurf(
-                    obj, default_viewport_level=2, default_render_level=2
-                )
+                if auto_create:
+                    mod = get_or_create_subsurf(
+                        obj, default_viewport_level=2, default_render_level=2
+                    )
+                else:
+                    mod = get_existing_subsurf(obj)
+                    if mod is None:
+                        continue
                 mod.levels -= 1
                 processed_count += 1
 
@@ -82,13 +95,19 @@ class NINO_OT_increase_subsurf_level(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context: Context) -> set[OperatorReturnItems]:
+        auto_create = context.scene.nino_tools_settings.subd_auto_create
         processed_count = 0
 
         for obj in context.selected_objects:
             if obj.type == "MESH":
-                mod = get_or_create_subsurf(
-                    obj, default_viewport_level=1, default_render_level=2
-                )
+                if auto_create:
+                    mod = get_or_create_subsurf(
+                        obj, default_viewport_level=1, default_render_level=2
+                    )
+                else:
+                    mod = get_existing_subsurf(obj)
+                    if mod is None:
+                        continue
                 mod.levels += 1
                 processed_count += 1
 
@@ -110,13 +129,19 @@ class NINO_OT_cycle_subsurf_preview(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context: Context) -> set[OperatorReturnItems]:
+        auto_create = context.scene.nino_tools_settings.subd_auto_create
         processed_count = 0
 
         for obj in context.selected_objects:
             if obj.type == "MESH":
-                mod = get_or_create_subsurf(
-                    obj, default_viewport_level=2, default_render_level=2
-                )
+                if auto_create:
+                    mod = get_or_create_subsurf(
+                        obj, default_viewport_level=2, default_render_level=2
+                    )
+                else:
+                    mod = get_existing_subsurf(obj)
+                    if mod is None:
+                        continue
 
                 # Toggle between both off and both on
                 both_on = mod.show_on_cage and mod.show_in_editmode
@@ -128,6 +153,45 @@ class NINO_OT_cycle_subsurf_preview(bpy.types.Operator):
         if processed_count > 0:
             self.report(
                 {"INFO"}, f"Cycled subd preview for {processed_count} object(s)"
+            )
+        else:
+            self.report({"WARNING"}, "No mesh objects selected")
+
+        return {"FINISHED"}
+
+
+class NINO_OT_set_subsurf_level(bpy.types.Operator):
+    """Set subdivision surface viewport level to a specific value"""
+
+    bl_idname = "nino.set_subsurf_level"
+    bl_label = "Set Subd Level"
+    bl_options = {"REGISTER", "UNDO"}
+
+    level: IntProperty(name="Level", default=2, min=0, max=11)
+
+    def execute(self, context: Context) -> set[OperatorReturnItems]:
+        auto_create = context.scene.nino_tools_settings.subd_auto_create
+        processed_count = 0
+
+        for obj in context.selected_objects:
+            if obj.type == "MESH":
+                if auto_create:
+                    mod = get_or_create_subsurf(
+                        obj,
+                        default_viewport_level=self.level,
+                        default_render_level=max(self.level, 2),
+                    )
+                else:
+                    mod = get_existing_subsurf(obj)
+                    if mod is None:
+                        continue
+                mod.levels = self.level
+                processed_count += 1
+
+        if processed_count > 0:
+            self.report(
+                {"INFO"},
+                f"Set subd level to {self.level} for {processed_count} object(s)",
             )
         else:
             self.report({"WARNING"}, "No mesh objects selected")
@@ -343,6 +407,7 @@ class NINO_OT_subdivide_selection_keep_corners(bpy.types.Operator):
 classes = (
     NINO_OT_decrease_subsurf_level,
     NINO_OT_increase_subsurf_level,
+    NINO_OT_set_subsurf_level,
     NINO_OT_cycle_subsurf_preview,
     NINO_OT_toggle_subd,
     NINO_OT_toggle_optimal_display,

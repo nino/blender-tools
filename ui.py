@@ -28,18 +28,30 @@ class NINO_PT_tools_panel(bpy.types.Panel):
         box = layout.box()
         box.label(text="Subd Tools", icon="MOD_SUBSURF")
 
-        col = box.column(align=True)
-        col.operator("nino.decrease_subsurf_level", text="Decrease Subd Level")
-        col.operator("nino.increase_subsurf_level", text="Increase Subd Level")
-        col.operator("nino.cycle_subsurf_preview", text="Cycle Subd Preview")
-        col.operator("nino.toggle_subd", text="Toggle Subd")
-        col.operator("nino.toggle_optimal_display", text="Toggle Optimal Display")
-        col.operator(
-            "nino.subdivide_selection", text="Subdivide Selection (Smooth All)"
+        box.prop(settings, "subd_auto_create")
+
+        # Level buttons: -, 1, 2, 3, 4, +
+        row = box.row(align=True)
+        row.operator("nino.decrease_subsurf_level", text="-")
+        for lvl in (1, 2, 3, 4):
+            row.operator("nino.set_subsurf_level", text=str(lvl)).level = lvl
+        row.operator("nino.increase_subsurf_level", text="+")
+
+        # Toggle buttons: Edit, Toggle, Opt
+        row = box.row(align=True)
+        row.operator(
+            "nino.cycle_subsurf_preview", text="Edit", icon="EDITMODE_HLT"
         )
-        col.operator(
-            "nino.subdivide_selection_keep_corners",
-            text="Subdivide Selection (Keep Corners)",
+        row.operator("nino.toggle_subd", text="Toggle", icon="HIDE_OFF")
+        row.operator(
+            "nino.toggle_optimal_display", text="Opt", icon="MOD_WIREFRAME"
+        )
+
+        # Subdivide buttons: Smooth, Smooth (corners)
+        row = box.row(align=True)
+        row.operator("nino.subdivide_selection", text="Smooth")
+        row.operator(
+            "nino.subdivide_selection_keep_corners", text="Smooth (corners)"
         )
 
         # Modifier tools section

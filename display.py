@@ -23,6 +23,12 @@ class NinoToolsSettings(PropertyGroup):
         default=False,
     )
 
+    subd_auto_create: BoolProperty(
+        name="Auto-create?",
+        description="Automatically create subdivision modifiers for objects that don't have one",
+        default=True,
+    )
+
 
 def set_wire_recursive(obj, enabled):
     """Recursively set wireframe display for an object and its children"""
