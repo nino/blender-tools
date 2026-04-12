@@ -89,6 +89,11 @@ class NINO_PT_modifier_tools(bpy.types.Panel):
         col = layout.column(align=True)
         col.operator("nino.refresh_shrinkwrap", text="Refresh Shrinkwrap")
 
+        row = col.row(align=True)
+        row.operator("nino.add_lattice", text="Add Lattice")
+        row.operator("nino.apply_lattice", text="Apply")
+        row.operator("nino.discard_lattice", text="Discard")
+
 
 class NINO_PT_image_tools(bpy.types.Panel):
     bl_label = "Image Tools"

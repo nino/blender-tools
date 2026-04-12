@@ -5,7 +5,7 @@ Nino's Tools - A Blender addon for subdivision surface management and more.
 bl_info = {
     "name": "Nino's Tools",
     "author": "Nino",
-    "version": (1, 8, 0),
+    "version": (1, 9, 0),
     "blender": (3, 0, 0),
     "location": "View3D > N Panel > Nino's Tools",
     "description": "Collection of helpful modeling tools",
@@ -20,16 +20,18 @@ if "bpy" in locals():
     importlib.reload(display)  # noqa: F821
     importlib.reload(stamping)  # noqa: F821
     importlib.reload(operators)  # noqa: F821
+    importlib.reload(lattice)  # noqa: F821
     importlib.reload(ui)  # noqa: F821
 
 import bpy  # noqa: E402
 
-from . import subd, display, stamping, operators, ui  # noqa: E402
+from . import subd, display, stamping, operators, lattice, ui  # noqa: E402
 
 _all_classes = (
     *display.classes,
     *subd.classes,
     *operators.classes,
+    *lattice.classes,
     *stamping.classes,
     *ui.classes,
 )
