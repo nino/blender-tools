@@ -13,32 +13,55 @@ class NINO_PT_tools_panel(bpy.types.Panel):
     bl_category = "Nino's Tools"
 
     def draw(self, context):
-        layout = self.layout
-        assert layout is not None
+        pass
 
+
+class NINO_PT_wireframe(bpy.types.Panel):
+    bl_label = "Wireframe"
+    bl_idname = "NINO_PT_wireframe"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Nino's Tools"
+    bl_parent_id = "NINO_PT_tools_panel"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon="SHADING_WIRE")
+
+    def draw(self, context):
+        layout = self.layout
+        settings = context.scene.nino_tools_settings
+        layout.prop(settings, "wireframe_on_selected")
+        layout.prop(settings, "wireframe_hierarchy")
+
+
+class NINO_PT_subd_tools(bpy.types.Panel):
+    bl_label = "Subd Tools"
+    bl_idname = "NINO_PT_subd_tools"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Nino's Tools"
+    bl_parent_id = "NINO_PT_tools_panel"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon="MOD_SUBSURF")
+
+    def draw(self, context):
+        layout = self.layout
         settings = context.scene.nino_tools_settings
 
-        # Wireframe settings section
-        box = layout.box()
-        box.label(text="Wireframe", icon="SHADING_WIRE")
-        box.prop(settings, "wireframe_on_selected")
-        box.prop(settings, "wireframe_hierarchy")
-
-        # Subd tools section
-        box = layout.box()
-        box.label(text="Subd Tools", icon="MOD_SUBSURF")
-
-        box.prop(settings, "subd_auto_create")
+        layout.prop(settings, "subd_auto_create")
 
         # Level buttons: -, 1, 2, 3, 4, +
-        row = box.row(align=True)
+        row = layout.row(align=True)
         row.operator("nino.decrease_subsurf_level", text="-")
         for lvl in (1, 2, 3, 4):
             row.operator("nino.set_subsurf_level", text=str(lvl)).level = lvl
         row.operator("nino.increase_subsurf_level", text="+")
 
         # Toggle buttons: Edit, Toggle, Opt
-        row = box.row(align=True)
+        row = layout.row(align=True)
         row.operator(
             "nino.cycle_subsurf_preview", text="Edit", icon="EDITMODE_HLT"
         )
@@ -48,32 +71,72 @@ class NINO_PT_tools_panel(bpy.types.Panel):
         )
 
         # Subdivide buttons: Smooth, Smooth (corners)
-        row = box.row(align=True)
+        row = layout.row(align=True)
         row.operator("nino.subdivide_selection", text="Smooth")
         row.operator(
             "nino.subdivide_selection_keep_corners", text="Smooth (corners)"
         )
 
-        # Modifier tools section
-        box = layout.box()
-        box.label(text="Modifier Tools", icon="MODIFIER")
 
-        col = box.column(align=True)
+class NINO_PT_modifier_tools(bpy.types.Panel):
+    bl_label = "Modifier Tools"
+    bl_idname = "NINO_PT_modifier_tools"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Nino's Tools"
+    bl_parent_id = "NINO_PT_tools_panel"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon="MODIFIER")
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column(align=True)
         col.operator("nino.refresh_shrinkwrap", text="Refresh Shrinkwrap")
 
-        # Image tools section
-        box = layout.box()
-        box.label(text="Image Tools", icon="IMAGE_DATA")
 
-        col = box.column(align=True)
+class NINO_PT_image_tools(bpy.types.Panel):
+    bl_label = "Image Tools"
+    bl_idname = "NINO_PT_image_tools"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Nino's Tools"
+    bl_parent_id = "NINO_PT_tools_panel"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon="IMAGE_DATA")
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column(align=True)
         col.operator("nino.reload_all_images", text="Reload All Images")
 
-        # Texture tools section
-        box = layout.box()
-        box.label(text="Texture Tools", icon="TEXTURE")
 
-        col = box.column(align=True)
+class NINO_PT_texture_tools(bpy.types.Panel):
+    bl_label = "Texture Tools"
+    bl_idname = "NINO_PT_texture_tools"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Nino's Tools"
+    bl_parent_id = "NINO_PT_tools_panel"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon="TEXTURE")
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column(align=True)
         col.operator("nino.stamp_texture_groups", text="Stamp Texture Groups")
 
 
-classes = (NINO_PT_tools_panel,)
+classes = (
+    NINO_PT_tools_panel,
+    NINO_PT_wireframe,
+    NINO_PT_subd_tools,
+    NINO_PT_modifier_tools,
+    NINO_PT_image_tools,
+    NINO_PT_texture_tools,
+)

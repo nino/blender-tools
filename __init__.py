@@ -5,7 +5,7 @@ Nino's Tools - A Blender addon for subdivision surface management and more.
 bl_info = {
     "name": "Nino's Tools",
     "author": "Nino",
-    "version": (1, 7, 0),
+    "version": (1, 8, 0),
     "blender": (3, 0, 0),
     "location": "View3D > N Panel > Nino's Tools",
     "description": "Collection of helpful modeling tools",
