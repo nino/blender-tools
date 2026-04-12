@@ -19,6 +19,9 @@ A Blender addon with a collection of helpful modeling tools.
 
 ### Modifier Tools
 - Refresh shrinkwrap modifiers by duplicating and re-applying them
+- Lattice helper: quickly add a lattice deformer fitted to selected geometry, then apply or discard it
+  - Supports local, world, and 3D cursor orientation for the bounding box
+  - Adjust lattice divisions (U/V/W) directly from the redo panel
 
 ### Image Tools
 - Reload all external images in the current file
